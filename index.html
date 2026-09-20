@@ -8,9 +8,11 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="Ask Wifey" />
   <title>Ask Wifey — PAW</title>
-  <link rel="manifest" href="manifest.webmanifest" />
-  <link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png" />
-  <link rel="stylesheet" href="styles.css" />
+  <link rel="manifest" href="manifest.webmanifest?v=14101" />
+  <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon-180.png?v=14101" />
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png?v=14101" />
+  <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png?v=14101" />
+  <link rel="stylesheet" href="styles.css?v=14101" />
 </head>
 <body>
   <div class="app-shell">
@@ -89,6 +91,18 @@
         <article class="teach-nudge">
           <div><span class="eyebrow">Wifey can learn more 🧠</span><strong>Don’t just tell me domain prices. Teach me your actual rules.</strong><p>Minimum balances, Tappy splits, purchase limits, debt rules, project protection — make Wifey behave like your money manager.</p></div>
           <button class="primary-btn" data-view-link="teach">Teach Wifey</button>
+        </article>
+
+        <article class="panel wifey-tools-panel">
+          <div class="panel-head"><div><span class="eyebrow">Wifey tools 💋</span><h3>Quick access without digging around.</h3></div></div>
+          <div class="wifey-tools-grid">
+            <button class="wifey-tool" data-view-link="wallets"><span>💳</span><strong>Wallets</strong><small>See what money belongs where</small></button>
+            <button class="wifey-tool" data-view-link="projects"><span>💼</span><strong>Projects</strong><small>Protect client money</small></button>
+            <button class="wifey-tool" data-view-link="budgets"><span>🎯</span><strong>Budgets</strong><small>Check your limits</small></button>
+            <button class="wifey-tool" data-view-link="commitments"><span>🧾</span><strong>Bills</strong><small>Money already promised</small></button>
+            <button class="wifey-tool" data-view-link="teach"><span>🧠</span><strong>Teach</strong><small>Add rules & memories</small></button>
+            <button class="wifey-tool" data-view-link="settings"><span>⚙️</span><strong>Settings</strong><small>Wifey brain & backups</small></button>
+          </div>
         </article>
 
         <div class="section-head">
@@ -239,9 +253,15 @@
             <p class="subcopy">Until Supabase sync is connected, export backups. You can now restore them too.</p>
             <div class="row-actions"><button class="ghost-btn" id="exportBtn">Export backup</button><button class="ghost-btn" id="importBtn">Restore backup</button><input id="importFile" type="file" accept="application/json" hidden /></div>
           </article>
-          <article class="panel">
+          <article class="panel install-panel">
             <span class="eyebrow">Install</span><h2>Put Wifey on your home screen.</h2>
-            <p class="subcopy" id="installCopy">Once served over HTTPS, Ask Wifey can install as a PWA.</p>
+            <p class="subcopy" id="installCopy">Checking the best install method for this device…</p>
+            <div class="ios-install-steps hidden" id="iosInstallSteps">
+              <div><span>1</span><p>Open Ask Wifey in <strong>Safari</strong>.</p></div>
+              <div><span>2</span><p>Tap the <strong>Share ↑</strong> button.</p></div>
+              <div><span>3</span><p>Choose <strong>Add to Home Screen</strong>.</p></div>
+              <div><span>4</span><p>Turn on <strong>Open as Web App</strong> if shown, then tap <strong>Add</strong>.</p></div>
+            </div>
             <button class="primary-btn" id="installBtn" hidden>Install Ask Wifey</button>
           </article>
           <article class="panel danger-panel">
@@ -259,17 +279,36 @@
     <button class="mobile-nav-item" data-view-link="ask"><span class="nav-glyph">W</span><span>Ask</span></button>
     <button class="mobile-add" id="mobileAddBtn" aria-label="Add expense">♥</button>
     <button class="mobile-nav-item" data-view-link="transactions"><span class="nav-glyph">↕</span><span>Activity</span></button>
-    <button class="mobile-nav-item" data-view-link="teach"><span class="nav-glyph">🧠</span><span>Teach</span></button>
+    <button class="mobile-nav-item" id="mobileMoreBtn" aria-haspopup="dialog" aria-controls="mobileMoreBackdrop" aria-expanded="false"><span class="nav-glyph">•••</span><span>More</span></button>
   </nav>
+
+  <div class="mobile-more-backdrop" id="mobileMoreBackdrop" aria-hidden="true">
+    <div class="mobile-more-sheet" role="dialog" aria-modal="true" aria-labelledby="mobileMoreTitle">
+      <div class="sheet-handle" aria-hidden="true"></div>
+      <div class="mobile-more-head">
+        <div><span class="eyebrow">Wifey drawer 💋</span><h2 id="mobileMoreTitle">What do you need, babe?</h2></div>
+        <button class="close-btn mobile-more-close" id="closeMobileMore" aria-label="Close more menu">×</button>
+      </div>
+      <div class="mobile-more-grid">
+        <button data-view-link="wallets"><span>💳</span><div><strong>Wallets</strong><small>Separate personal & business money</small></div></button>
+        <button data-view-link="projects"><span>💼</span><div><strong>Projects</strong><small>Client revenue, costs & workflow</small></div></button>
+        <button data-view-link="budgets"><span>🎯</span><div><strong>Budgets</strong><small>Spending limits & warnings</small></div></button>
+        <button data-view-link="commitments"><span>🧾</span><div><strong>Bills & commitments</strong><small>Subscriptions and money already promised</small></div></button>
+        <button data-view-link="teach"><span>🧠</span><div><strong>Teach Wifey</strong><small>Rules, memories & boundaries</small></div></button>
+        <button data-view-link="settings"><span>⚙️</span><div><strong>Settings</strong><small>Wifey brain, install & backups</small></div></button>
+      </div>
+    </div>
+  </div>
 
   <div class="modal-backdrop" id="modalBackdrop" aria-hidden="true">
     <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <div class="sheet-handle modal-handle" aria-hidden="true"></div>
       <button class="close-btn" id="closeModal" aria-label="Close">×</button>
       <div id="modalContent"></div>
     </div>
   </div>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
-  <script src="app.js"></script>
+  <script src="app.js?v=14101"></script>
 </body>
 </html>

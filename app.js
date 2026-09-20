@@ -339,10 +339,37 @@ document.querySelectorAll('[data-view-link]').forEach(el => el.addEventListener(
 }));
 function showView(name){
   document.querySelectorAll('.view').forEach(v => v.classList.toggle('active', v.dataset.view === name));
-  document.querySelectorAll('.nav-item,.mobile-nav-item').forEach(v => v.classList.toggle('active', v.dataset.viewLink === name));
+  document.querySelectorAll('.nav-item,.mobile-nav-item[data-view-link]').forEach(v => v.classList.toggle('active', v.dataset.viewLink === name));
+  const moreBtn=document.getElementById('mobileMoreBtn');
+  if(moreBtn) moreBtn.classList.toggle('active',['wallets','projects','budgets','commitments','teach','settings'].includes(name));
   document.getElementById('pageTitle').textContent = titles[name] || titles.dashboard;
+  closeMobileMore();
   window.scrollTo({top:0,behavior:'smooth'});
 }
+
+function syncBodySheetLock(){
+  const modalOpen=document.getElementById('modalBackdrop')?.classList.contains('open');
+  const moreOpen=document.getElementById('mobileMoreBackdrop')?.classList.contains('open');
+  document.body.classList.toggle('sheet-open',Boolean(modalOpen||moreOpen));
+}
+function openMobileMore(){
+  const backdrop=document.getElementById('mobileMoreBackdrop'),btn=document.getElementById('mobileMoreBtn');
+  if(!backdrop)return;
+  backdrop.classList.add('open'); backdrop.setAttribute('aria-hidden','false');
+  if(btn)btn.setAttribute('aria-expanded','true'); syncBodySheetLock();
+}
+function closeMobileMore(){
+  const backdrop=document.getElementById('mobileMoreBackdrop'),btn=document.getElementById('mobileMoreBtn');
+  if(!backdrop)return;
+  backdrop.classList.remove('open'); backdrop.setAttribute('aria-hidden','true');
+  if(btn)btn.setAttribute('aria-expanded','false'); syncBodySheetLock();
+}
+const mobileMoreBtn=document.getElementById('mobileMoreBtn');
+if(mobileMoreBtn)mobileMoreBtn.addEventListener('click',openMobileMore);
+const closeMobileMoreBtn=document.getElementById('closeMobileMore');
+if(closeMobileMoreBtn)closeMobileMoreBtn.addEventListener('click',closeMobileMore);
+const mobileMoreBackdrop=document.getElementById('mobileMoreBackdrop');
+if(mobileMoreBackdrop)mobileMoreBackdrop.addEventListener('click',e=>{if(e.target===mobileMoreBackdrop)closeMobileMore();});
 
 function renderAll(){
   document.getElementById('todayLabel').textContent = new Intl.DateTimeFormat('en-LK',{weekday:'long',day:'numeric',month:'long'}).format(new Date());
@@ -542,15 +569,17 @@ function deleteTransaction(id){
 }
 
 function modal(html){
+  closeMobileMore();
   document.getElementById('modalContent').innerHTML = html;
   document.getElementById('modalBackdrop').classList.add('open');
   document.getElementById('modalBackdrop').setAttribute('aria-hidden','false');
-  setTimeout(() => document.querySelector('#modalContent input, #modalContent select')?.focus(), 30);
+  syncBodySheetLock();
+  setTimeout(() => document.querySelector('#modalContent input, #modalContent select, #modalContent textarea')?.focus({preventScroll:true}), 80);
 }
-function closeModal(){ document.getElementById('modalBackdrop').classList.remove('open'); document.getElementById('modalBackdrop').setAttribute('aria-hidden','true'); }
+function closeModal(){ document.getElementById('modalBackdrop').classList.remove('open'); document.getElementById('modalBackdrop').setAttribute('aria-hidden','true'); syncBodySheetLock(); }
 document.getElementById('closeModal').onclick = closeModal;
 document.getElementById('modalBackdrop').addEventListener('click', e => { if(e.target.id === 'modalBackdrop') closeModal(); });
-document.addEventListener('keydown', e => { if(e.key === 'Escape') closeModal(); });
+document.addEventListener('keydown', e => { if(e.key === 'Escape'){ if(document.getElementById('modalBackdrop')?.classList.contains('open'))closeModal(); else closeMobileMore(); } });
 
 function expenseForm(){
   modal(`<span class="eyebrow">New expense</span><h2 id="modalTitle">Money went out.</h2><form id="txForm" class="form-grid">
@@ -759,13 +788,33 @@ document.getElementById('importFile').addEventListener('change', async e => {
 });
 document.getElementById('resetBtn').onclick = () => { if(confirm('Reset all Ask Wifey local data? This cannot be undone unless you exported a backup.')){ state=cloneDefault(); save(); toast('Local data reset.'); } };
 
-window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); deferredInstallPrompt=e; const btn=document.getElementById('installBtn'); btn.hidden=false; document.getElementById('installCopy').textContent='Ask Wifey is ready to install on this device.'; });
-document.getElementById('installBtn').onclick = async () => { if(!deferredInstallPrompt)return; deferredInstallPrompt.prompt(); await deferredInstallPrompt.userChoice; deferredInstallPrompt=null; document.getElementById('installBtn').hidden=true; };
-window.addEventListener('appinstalled', () => { document.getElementById('installCopy').textContent='Ask Wifey is installed on this device.'; });
+const installBtn=document.getElementById('installBtn');
+const installCopy=document.getElementById('installCopy');
+const iosInstallSteps=document.getElementById('iosInstallSteps');
+const isIOS=/iPad|iPhone|iPod/i.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+const isStandalone=()=>window.matchMedia('(display-mode: standalone)').matches||window.navigator.standalone===true;
+function renderInstallUI(){
+  if(isStandalone()){
+    installCopy.textContent='Wifey is already living on your home screen. 💋';
+    installBtn.hidden=true; iosInstallSteps.classList.add('hidden'); return;
+  }
+  if(isIOS){
+    installCopy.textContent='iPhone does not show the normal install popup. Use Safari and add Wifey to your Home Screen manually:';
+    installBtn.hidden=true; iosInstallSteps.classList.remove('hidden'); return;
+  }
+  iosInstallSteps.classList.add('hidden');
+  installCopy.textContent=deferredInstallPrompt?'Ask Wifey is ready to install on this device.':'Open this site in a supported browser over HTTPS to install Ask Wifey.';
+  installBtn.hidden=!deferredInstallPrompt;
+}
+window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); deferredInstallPrompt=e; renderInstallUI(); });
+installBtn.onclick = async () => { if(!deferredInstallPrompt)return; deferredInstallPrompt.prompt(); await deferredInstallPrompt.userChoice; deferredInstallPrompt=null; renderInstallUI(); };
+window.addEventListener('appinstalled', () => { deferredInstallPrompt=null; renderInstallUI(); });
+window.matchMedia('(display-mode: standalone)').addEventListener?.('change',renderInstallUI);
+renderInstallUI();
 
 function toast(msg){ const el=document.getElementById('toast'); el.textContent=msg; el.classList.add('show'); clearTimeout(toast.timer); toast.timer=setTimeout(()=>el.classList.remove('show'),2200); }
 function escapeHtml(s=''){ return String(s).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c])); }
 function escapeAttr(s=''){ return escapeHtml(s).replace(/`/g,'&#96;'); }
 
-if('serviceWorker' in navigator){ navigator.serviceWorker.register('./sw.js').catch(()=>{}); }
+if('serviceWorker' in navigator){ navigator.serviceWorker.register('./sw.js?v=14101').catch(()=>{}); }
 renderAll();
