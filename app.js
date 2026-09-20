@@ -1,5 +1,5 @@
 const STORAGE_KEY = 'ask-wifey-v1';
-const APP_VERSION = '1.3';
+const APP_VERSION = '1.4';
 const money = n => `Rs. ${Math.round(Number(n || 0)).toLocaleString('en-LK')}`;
 const uid = () => (crypto.randomUUID ? crypto.randomUUID().slice(0, 12) : Math.random().toString(36).slice(2, 12));
 const localDate = d => {
@@ -23,6 +23,11 @@ const defaultState = {
     paymentPlan:{advance:50,approval:20,deployment:30}
   },
   smartTasks:[],
+  rules:[
+    {id:'rule-project-protect',name:'Project money needs a project',type:'require_project',severity:'strict',active:true,walletScope:'project',category:'any',amount:0,sourceType:'any',targetWalletId:'',note:'Project money should only be spent on the project it belongs to.'},
+    {id:'rule-debt-first',name:'Debt before fun',type:'debt_first',severity:'warn',active:true,walletScope:'any',category:'optional',amount:0,sourceType:'any',targetWalletId:'',note:'If debt is still open, optional spending gets a warning.'}
+  ],
+  memories:[],
   wallets: [
     {id:'personal',name:'Personal',type:'personal',balance:7000,reserved:0,icon:'◉'},
     {id:'lomos',name:'LOMOS',type:'business',balance:0,reserved:0,icon:'L'},
@@ -52,6 +57,8 @@ function normalizeState(raw){
   s.brain = {...base.brain, ...(raw.brain||{})};
   s.brain.paymentPlan = {...base.brain.paymentPlan, ...((raw.brain||{}).paymentPlan||{})};
   s.smartTasks = Array.isArray(raw.smartTasks) ? raw.smartTasks.map(t => ({id:t.id||uid(),title:t.title||'Task',projectId:t.projectId||null,kind:t.kind||'general',status:t.status||'open',dueDate:t.dueDate||'',note:t.note||'',createdAt:t.createdAt||new Date().toISOString()})) : [];
+  s.rules = Array.isArray(raw.rules) ? raw.rules.map(r => ({id:r.id||uid(),name:r.name||'Wifey rule',type:r.type||'custom_reminder',severity:r.severity||'warn',active:r.active!==false,walletScope:r.walletScope||'any',category:r.category||'any',amount:Number(r.amount||0),sourceType:r.sourceType||'any',targetWalletId:r.targetWalletId||'',note:r.note||''})) : base.rules;
+  s.memories = Array.isArray(raw.memories) ? raw.memories.map(m => ({id:m.id||uid(),area:m.area||'general',label:m.label||'Memory',value:m.value||'',note:m.note||'',keywords:m.keywords||'',active:m.active!==false,createdAt:m.createdAt||new Date().toISOString()})) : [];
   s.wallets = Array.isArray(s.wallets) && s.wallets.length ? s.wallets.map(w => ({
     id:w.id || uid(), name:w.name || 'Wallet', type:w.type || 'personal',
     balance:Number(w.balance || 0), reserved:Number(w.reserved || 0), icon:w.icon || '•'
@@ -170,7 +177,10 @@ function wifeyBriefs(){
   });
   const loan=state.commitments.filter(c=>c.active!==false&&c.kind==='debt').reduce((s,c)=>s+c.amount,0);
   if(loan>0) briefs.push({tone:'danger',title:'Borrowed money is not income',text:`You still need to repay ${money(loan)}.`});
-  return briefs.slice(0,6);
+  state.rules.filter(r=>r.active!==false&&r.type==='custom_reminder').slice(0,2).forEach(r=>briefs.push({tone:'neutral',title:r.name,text:r.note||'You taught Wifey to keep this in mind.'}));
+  const strictRules=state.rules.filter(r=>r.active!==false&&r.severity==='strict'&&r.type!=='income_split').length;
+  if(strictRules) briefs.push({tone:'neutral',title:`${strictRules} strict Wifey rule${strictRules===1?' is':'s are'} active`,text:'These rules can stop a purchase or transfer, not just warn you.'});
+  return briefs.slice(0,7);
 }
 function renderWifeyBriefing(){
   const el=document.getElementById('wifeyBriefing'); if(!el) return;
@@ -190,10 +200,138 @@ function smartProjectReminder(projectId){
   return items;
 }
 
+function ruleTypeLabel(type){
+  return ({min_balance:'Minimum balance',purchase_limit:'Purchase limit',monthly_category_cap:'Monthly category cap',require_project:'Project protection',debt_first:'Debt before fun',income_split:'Income auto-split',transfer_limit:'Owner / transfer limit',custom_reminder:'Custom reminder'})[type] || 'Custom rule';
+}
+function severityLabel(severity){ return severity==='strict'?'Strict · can say no':severity==='ask'?'Ask me first':'Warn me'; }
+function walletMatchesScope(scope,w){
+  if(!w || !scope || scope==='any') return true;
+  if(scope==='personal') return w.type==='personal';
+  if(scope==='business') return w.type==='business';
+  if(scope==='project') return w.type==='project';
+  if(scope==='business-project') return ['business','project'].includes(w.type);
+  if(scope.startsWith('wallet:')) return w.id===scope.slice(7);
+  return true;
+}
+function categoryMatches(ruleCategory,category){
+  if(!ruleCategory || ruleCategory==='any') return true;
+  if(ruleCategory==='optional') return ['Going out','Shopping','Other'].includes(category);
+  return ruleCategory===category;
+}
+function ruleSummary(r){
+  const w = r.walletScope?.startsWith('wallet:') ? wallet(r.walletScope.slice(7))?.name : ({any:'any wallet',personal:'personal money',business:'business wallets',project:'project wallets','business-project':'business/project wallets'})[r.walletScope] || 'any wallet';
+  if(r.type==='min_balance') return `Keep at least ${money(r.amount)} in ${w}.`;
+  if(r.type==='purchase_limit') return `${severityLabel(r.severity)} when a ${r.category==='any'?'purchase':r.category+' purchase'} is over ${money(r.amount)}.`;
+  if(r.type==='monthly_category_cap') return `${severityLabel(r.severity)} if ${r.category} spending would pass ${money(r.amount)} this month.`;
+  if(r.type==='require_project') return `Require a project before spending from ${w}.`;
+  if(r.type==='debt_first') return `${severityLabel(r.severity)} on ${r.category==='optional'?'optional':r.category==='any'?'any':r.category} spending while debt is open${r.amount?` above ${money(r.amount)}`:''}.`;
+  if(r.type==='income_split') return `On ${r.sourceType==='any'?'any':r.sourceType} income, send ${r.amount}% to ${wallet(r.targetWalletId)?.name||'a wallet'}.`;
+  if(r.type==='transfer_limit') return `${severityLabel(r.severity)} when moving more than ${money(r.amount)} from ${w} to personal money.`;
+  return r.note || 'Bring this reminder into Wifey decisions.';
+}
+function strongestSeverity(findings=[]){
+  if(findings.some(f=>f.severity==='strict')) return 'strict';
+  if(findings.some(f=>f.severity==='ask')) return 'ask';
+  return findings.length ? 'warn' : null;
+}
+function evaluatePurchaseRules({amount,walletId,category,projectId,item}){
+  const w=wallet(walletId), findings=[];
+  const afterBase=Math.max(0,(w?.balance||0)-(w?.reserved||0)-commitmentsForWallet(walletId)-Number(amount||0));
+  const debt=state.commitments.filter(c=>c.active!==false&&c.kind==='debt').reduce((sum,c)=>sum+c.amount,0);
+  state.rules.filter(r=>r.active!==false).forEach(r=>{
+    if(r.type==='income_split'||r.type==='transfer_limit') return;
+    if(!walletMatchesScope(r.walletScope,w)) return;
+    if(r.type==='min_balance' && afterBase < r.amount) findings.push({rule:r,severity:r.severity,message:`${r.name}: this would leave ${money(Math.max(0,afterBase))}, below your ${money(r.amount)} floor.`});
+    if(r.type==='purchase_limit' && categoryMatches(r.category,category) && amount > r.amount) findings.push({rule:r,severity:r.severity,message:`${r.name}: ${money(amount)} is above your ${money(r.amount)} purchase limit.`});
+    if(r.type==='monthly_category_cap' && categoryMatches(r.category,category) && monthSpent(category)+amount > r.amount) findings.push({rule:r,severity:r.severity,message:`${r.name}: this would take ${category} to ${money(monthSpent(category)+amount)} this month.`});
+    if(r.type==='require_project' && !projectId) findings.push({rule:r,severity:r.severity,message:`${r.name}: choose the project before using this money.`});
+    if(r.type==='debt_first' && debt>0 && categoryMatches(r.category,category) && (!r.amount || amount>=r.amount)) findings.push({rule:r,severity:r.severity,message:`${r.name}: you still owe ${money(debt)} before this kind of spending gets comfortable.`});
+    if(r.type==='custom_reminder' && categoryMatches(r.category,category)) findings.push({rule:r,severity:'note',message:r.note||r.name});
+  });
+  return {findings,severity:strongestSeverity(findings.filter(f=>f.severity!=='note'))};
+}
+function evaluateTransferRules({amount,fromWalletId,toWalletId}){
+  const from=wallet(fromWalletId),to=wallet(toWalletId), findings=[];
+  if(!from||!to) return {findings,severity:null};
+  state.rules.filter(r=>r.active!==false&&r.type==='transfer_limit').forEach(r=>{
+    if(walletMatchesScope(r.walletScope,from)&&to.type==='personal'&&amount>r.amount){
+      findings.push({rule:r,severity:r.severity,message:`${r.name}: ${money(amount)} is above your ${money(r.amount)} transfer limit.`});
+    }
+  });
+  return {findings,severity:strongestSeverity(findings)};
+}
+function incomeSplitRules(sourceType,total){
+  return state.rules.filter(r=>r.active!==false&&r.type==='income_split'&&(r.sourceType==='any'||r.sourceType===sourceType)&&r.targetWalletId&&r.amount>0)
+    .map(r=>({rule:r,walletId:r.targetWalletId,percent:Math.min(100,Math.max(0,r.amount)),amount:Math.round(total*Math.min(100,Math.max(0,r.amount))/100)}));
+}
+function relevantMemories({item='',category='',walletId='',projectId=null}={}){
+  const w=wallet(walletId); const hay=`${item} ${category} ${w?.name||''} ${project(projectId)?.name||''}`.toLowerCase();
+  return state.memories.filter(m=>m.active!==false).filter(m=>{
+    const keys=String(m.keywords||'').split(',').map(x=>x.trim().toLowerCase()).filter(Boolean);
+    const keywordHit=keys.some(k=>hay.includes(k)) || (m.label&&hay.includes(String(m.label).toLowerCase()));
+    const areaHit=(m.area==='personal'&&w?.type==='personal')||(m.area==='lomos'&&w?.id==='lomos')||(m.area==='tappy'&&w?.id==='tappy')||(m.area==='projects'&&projectId)||(m.area==='general'&&keys.length===0);
+    return keywordHit||areaHit;
+  }).slice(0,3);
+}
+function memoryText(m){ return `${m.label}${m.value?`: ${m.value}`:''}${m.note?` — ${m.note}`:''}`; }
+function renderTeach(){
+  const list=document.getElementById('ruleList'), memories=document.getElementById('memoryList'); if(!list||!memories) return;
+  const active=state.rules.filter(r=>r.active!==false);
+  document.getElementById('ruleCount').textContent=active.length;
+  document.getElementById('memoryCount').textContent=state.memories.filter(m=>m.active!==false).length;
+  document.getElementById('strictRuleCount').textContent=active.filter(r=>r.severity==='strict'&&r.type!=='income_split').length;
+  list.innerHTML=state.rules.length?state.rules.map(r=>`<div class="rule-card ${r.active===false?'muted-rule':''}"><div class="rule-icon">${r.type==='income_split'?'💸':r.severity==='strict'?'😒':r.severity==='ask'?'🥺':'👀'}</div><div class="rule-copy"><div class="rule-top"><strong>${escapeHtml(r.name)}</strong><span class="rule-badge ${r.severity}">${r.type==='income_split'?'Auto':escapeHtml(severityLabel(r.severity))}</span></div><span>${escapeHtml(ruleTypeLabel(r.type))}</span><p>${escapeHtml(ruleSummary(r))}</p>${r.note&&r.type!=='custom_reminder'?`<small>“${escapeHtml(r.note)}”</small>`:''}</div><div class="rule-actions"><button class="small-btn" data-toggle-rule="${r.id}">${r.active===false?'Turn on':'Pause'}</button><button class="small-btn" data-edit-rule="${r.id}">Edit</button><button class="small-btn danger" data-delete-rule="${r.id}">Delete</button></div></div>`).join(''):'<div class="empty">Wifey has no custom rules yet. That is… concerning. 👀</div>';
+  memories.innerHTML=state.memories.length?state.memories.map(m=>`<div class="memory-card ${m.active===false?'muted-rule':''}"><div class="memory-pin">💌</div><div><div class="rule-top"><strong>${escapeHtml(m.label)}</strong><span class="memory-area">${escapeHtml(m.area)}</span></div><p>${escapeHtml(m.value||m.note||'Saved memory')}</p>${m.value&&m.note?`<small>${escapeHtml(m.note)}</small>`:''}${m.keywords?`<span class="memory-keywords">Triggers: ${escapeHtml(m.keywords)}</span>`:''}</div><div class="rule-actions"><button class="small-btn" data-toggle-memory="${m.id}">${m.active===false?'Turn on':'Pause'}</button><button class="small-btn" data-edit-memory="${m.id}">Edit</button><button class="small-btn danger" data-delete-memory="${m.id}">Delete</button></div></div>`).join(''):'<div class="empty">Teach Wifey facts like supplier costs, renewal dates, or how Tappy usually spends money.</div>';
+  document.querySelectorAll('[data-toggle-rule]').forEach(b=>b.onclick=()=>{const r=state.rules.find(x=>x.id===b.dataset.toggleRule);if(r){r.active=!r.active;save();}});
+  document.querySelectorAll('[data-edit-rule]').forEach(b=>b.onclick=()=>ruleForm(b.dataset.editRule));
+  document.querySelectorAll('[data-delete-rule]').forEach(b=>b.onclick=()=>{if(confirm('Forget this rule?')){state.rules=state.rules.filter(r=>r.id!==b.dataset.deleteRule);save();toast('Rule forgotten. Don’t abuse the freedom. 👀');}});
+  document.querySelectorAll('[data-toggle-memory]').forEach(b=>b.onclick=()=>{const m=state.memories.find(x=>x.id===b.dataset.toggleMemory);if(m){m.active=!m.active;save();}});
+  document.querySelectorAll('[data-edit-memory]').forEach(b=>b.onclick=()=>memoryForm(b.dataset.editMemory));
+  document.querySelectorAll('[data-delete-memory]').forEach(b=>b.onclick=()=>{if(confirm('Forget this memory?')){state.memories=state.memories.filter(m=>m.id!==b.dataset.deleteMemory);save();toast('Memory removed.');}});
+}
+function ruleForm(id=null,preset=null){
+  const current=id?state.rules.find(r=>r.id===id):null;
+  const seed={name:'',type:'min_balance',severity:'warn',walletScope:'any',category:'any',amount:0,sourceType:'any',targetWalletId:'',note:'',...(preset||{}),...(current||{})};
+  const walletScopes=`<option value="any">Any wallet</option><option value="personal">All personal wallets</option><option value="business">All business wallets</option><option value="project">All project wallets</option><option value="business-project">Business + project wallets</option>${state.wallets.map(w=>`<option value="wallet:${w.id}">${escapeHtml(w.name)} only</option>`).join('')}`;
+  const cats=`<option value="any">Any category</option><option value="optional">Optional spending (Going out / Shopping / Other)</option>${state.categories.map(c=>`<option value="${escapeAttr(c)}">${escapeHtml(c)}</option>`).join('')}`;
+  modal(`<span class="eyebrow">Teach Wifey 🧠</span><h2 id="modalTitle">${current?'Edit the rule.':'What should I do next time?'}</h2><p class="subcopy">Use a structured rule so Wifey can enforce it reliably. Add your own wording so she remembers why.</p><form id="ruleForm" class="form-grid">
+    <label class="full">Rule name<input id="ruleName" required value="${escapeAttr(seed.name)}" placeholder="e.g. Never touch my last 15k" /></label>
+    <label>Rule type<select id="ruleType"><option value="min_balance">Keep a minimum balance</option><option value="purchase_limit">Purchase amount limit</option><option value="monthly_category_cap">Monthly category cap</option><option value="require_project">Require a project</option><option value="debt_first">Debt before optional spending</option><option value="income_split">Auto-split income</option><option value="transfer_limit">Business → personal transfer limit</option><option value="custom_reminder">Custom reminder</option></select></label>
+    <label id="severityWrap">How strict?<select id="ruleSeverity"><option value="warn">Warn me</option><option value="ask">Ask me first</option><option value="strict">Strict · say no</option></select></label>
+    <label id="walletScopeWrap">Applies to<select id="ruleWalletScope">${walletScopes}</select></label>
+    <label id="categoryWrap">Category<select id="ruleCategory">${cats}</select></label>
+    <label id="amountWrap">Amount / limit<input id="ruleAmount" type="number" min="0" step="1" inputmode="numeric" value="${Number(seed.amount||0)}" /></label>
+    <label id="sourceWrap" class="hidden">Income source<select id="ruleSource"><option value="any">Any income</option><option value="client">Client / project</option><option value="lomos">LOMOS general</option><option value="tappy">Tappy</option><option value="personal">Personal</option><option value="loan">Loan</option><option value="other">Other</option></select></label>
+    <label id="targetWrap" class="hidden">Send it to<select id="ruleTarget">${state.wallets.map(w=>`<option value="${w.id}">${escapeHtml(w.name)}</option>`).join('')}</select></label>
+    <label class="full">What should Wifey remember / say?<textarea id="ruleNote" rows="3" placeholder="e.g. That money is for stock, not random subscriptions.">${escapeHtml(seed.note||'')}</textarea></label>
+    <button class="primary-btn full">${current?'Save what I taught you':'Teach Wifey this rule'} 💋</button></form>`);
+  const type=document.getElementById('ruleType'),severity=document.getElementById('ruleSeverity'),scope=document.getElementById('ruleWalletScope'),cat=document.getElementById('ruleCategory'),amount=document.getElementById('ruleAmount'),source=document.getElementById('ruleSource'),target=document.getElementById('ruleTarget');
+  type.value=seed.type;severity.value=seed.severity;scope.value=seed.walletScope;cat.value=seed.category;source.value=seed.sourceType; if(seed.targetWalletId)target.value=seed.targetWalletId;
+  const sync=()=>{const t=type.value;document.getElementById('severityWrap').classList.toggle('hidden',t==='income_split'||t==='custom_reminder');document.getElementById('walletScopeWrap').classList.toggle('hidden',['monthly_category_cap','income_split'].includes(t));document.getElementById('categoryWrap').classList.toggle('hidden',['min_balance','require_project','income_split','transfer_limit'].includes(t));document.getElementById('amountWrap').classList.toggle('hidden',['require_project','custom_reminder'].includes(t));document.getElementById('sourceWrap').classList.toggle('hidden',t!=='income_split');document.getElementById('targetWrap').classList.toggle('hidden',t!=='income_split');const amountLabel=document.querySelector('#amountWrap');if(amountLabel){amountLabel.childNodes[0].nodeValue=t==='income_split'?'Percent to allocate ':t==='monthly_category_cap'?'Monthly cap ':t==='min_balance'?'Minimum balance ':'Amount / limit ';}};
+  type.onchange=sync; sync();
+  document.getElementById('ruleForm').onsubmit=e=>{e.preventDefault();const data={id:current?.id||uid(),name:document.getElementById('ruleName').value.trim(),type:type.value,severity:type.value==='custom_reminder'?'warn':severity.value,active:current?.active!==false,walletScope:scope.value,category:cat.value,amount:Number(amount.value||0),sourceType:source.value,targetWalletId:target.value,note:document.getElementById('ruleNote').value.trim()};if(data.type==='income_split'&&(data.amount<=0||data.amount>100)){toast('Income split must be between 1% and 100%.');return;}if(['min_balance','purchase_limit','monthly_category_cap','transfer_limit'].includes(data.type)&&data.amount<=0){toast('Give Wifey a real amount for this rule.');return;}if(current)Object.assign(current,data);else state.rules.push(data);save();closeModal();toast('Learned. I’ll remember that next time. 🧠💋');};
+}
+function memoryForm(id=null){
+  const current=id?state.memories.find(m=>m.id===id):null; const m=current||{area:'general',label:'',value:'',note:'',keywords:''};
+  modal(`<span class="eyebrow">Wifey memory 💌</span><h2 id="modalTitle">${current?'Update what I know.':'Tell me something worth remembering.'}</h2><form id="memoryForm" class="form-grid"><label>Area<select id="memoryArea"><option value="general">General</option><option value="lomos">LOMOS</option><option value="tappy">Tappy</option><option value="personal">Personal</option><option value="projects">Projects</option></select></label><label>Memory name<input id="memoryLabel" required value="${escapeAttr(m.label||'')}" placeholder="e.g. Tappy card printing" /></label><label class="full">Value / fact<input id="memoryValue" value="${escapeAttr(m.value||'')}" placeholder="e.g. Rs. 650 per card" /></label><label class="full">Extra context<textarea id="memoryNote" rows="3" placeholder="Supplier, reason, what to check next time…">${escapeHtml(m.note||'')}</textarea></label><label class="full">Trigger words<input id="memoryKeywords" value="${escapeAttr(m.keywords||'')}" placeholder="e.g. card, print, stock, NFC" /><small>Comma-separated. If your purchase matches these words, Wifey brings this memory back.</small></label><button class="primary-btn full">Remember this 💋</button></form>`);
+  document.getElementById('memoryArea').value=m.area||'general';
+  document.getElementById('memoryForm').onsubmit=e=>{e.preventDefault();const data={id:current?.id||uid(),area:memoryArea.value,label:memoryLabel.value.trim(),value:memoryValue.value.trim(),note:memoryNote.value.trim(),keywords:memoryKeywords.value.trim(),active:current?.active!==false,createdAt:current?.createdAt||new Date().toISOString()};if(current)Object.assign(current,data);else state.memories.push(data);save();closeModal();toast('I’ll remember that, babe. 💌');};
+}
+function openRulePreset(name){
+  const presets={
+    'personal-floor':{name:'Never touch my last Rs. 15,000',type:'min_balance',severity:'strict',walletScope:'personal',amount:15000,note:'Keep a real personal safety floor even when I feel rich.'},
+    'big-purchase':{name:'Ask me twice above Rs. 10,000',type:'purchase_limit',severity:'ask',walletScope:'any',category:'any',amount:10000,note:'Big purchases deserve one more thought.'},
+    'project-protection':{name:'Project money needs a project',type:'require_project',severity:'strict',walletScope:'project',note:'No random spending from project money.'},
+    'debt-first':{name:'Debt before fun',type:'debt_first',severity:'warn',walletScope:'any',category:'optional',amount:0,note:'Side-eye optional spending while I still owe money.'},
+    'income-split':{name:'Auto-split this income',type:'income_split',severity:'warn',sourceType:'tappy',targetWalletId:state.wallets.find(w=>w.id==='reserve')?.id||state.wallets[0]?.id,amount:10,note:'Give this percentage a job before I can spend the rest.'},
+    'owner-draw':{name:'Cap business-to-personal transfers',type:'transfer_limit',severity:'ask',walletScope:'business-project',amount:20000,note:'Don’t let me casually drain the business.'}
+  }; ruleForm(null,presets[name]||null);
+}
+
 const titles = {
   dashboard:'Okay babe, here’s the situation. 💋', ask:'Permission before purchase. 👀', transactions:'Show me the receipts. 🧾',
   wallets:'Our money, properly separated.', projects:'Client money is not shopping money.', budgets:'Boundaries are attractive. 😌',
-  commitments:'Promises we already made.', settings:'Teach Wifey how you like it.'
+  commitments:'Promises we already made.', teach:'Teach Wifey how our money works. 🧠', settings:'Teach Wifey how you like it.'
 };
 
 document.querySelectorAll('[data-view-link]').forEach(el => el.addEventListener('click', e => {
@@ -217,7 +355,7 @@ function renderAll(){
   document.getElementById('upcomingCash').textContent = money(upcomingCash());
   document.getElementById('safeStatus').textContent = personal === 0 ? 'Nope. Hands off. 😌' : personal < 5000 ? 'Easy there, babe 👀' : 'Wifey-approved ✨';
   document.getElementById('safeMessage').textContent = personal === 0 ? 'Your personal money already has jobs. We are not stealing from future-us.' : personal < 5000 ? 'That is the most I’m comfortable letting you touch after bills, locks and promises.' : 'This is actually yours after the serious stuff is protected. Yes, I checked twice.';
-  renderWallets(); renderTransactions(); renderBudgets(); renderProjects(); renderAskOptions(); renderRecent(); renderCommitments(); renderDataNotice(); renderWifeyBriefing(); renderWifeyMood();
+  renderWallets(); renderTransactions(); renderBudgets(); renderProjects(); renderAskOptions(); renderRecent(); renderCommitments(); renderDataNotice(); renderWifeyBriefing(); renderWifeyMood(); renderTeach();
   document.getElementById('strictness').value = state.strictness;
   document.getElementById('strictnessLabel').textContent = ['','Chill','Balanced','Strict'][state.strictness];
   if(document.getElementById('brainDomainCost')){
@@ -335,19 +473,22 @@ function safetyBufferFor(w){
   return state.strictness === 3 ? 5000 : state.strictness === 2 ? 2500 : 0;
 }
 function askWifey(amount,walletId,category,item,projectId=null){
-  const w = wallet(walletId); if(!w) return {status:'rejected',title:'Pick a real wallet.',message:'Wifey cannot check money that has nowhere to live.'};
+  const w = wallet(walletId); if(!w) return {status:'rejected',title:'Pick a real wallet.',message:'Wifey cannot check money that has nowhere to live.',ruleFindings:[],memories:[]};
   const budget = budgetFor(category), spent = monthSpent(category), budgetLeft = budget ? budget.limit-spent : null;
   const matchingCommitment = projectId ? state.commitments.find(c=>c.active!==false&&c.projectId===projectId&&c.walletId===walletId&&c.category===category) : null;
   const committedAll = commitmentsForWallet(walletId);
   const committed = Math.max(0, committedAll - (matchingCommitment ? Math.min(matchingCommitment.amount, amount) : 0));
   const freeBefore = Math.max(0,w.balance-w.reserved-committed), after = freeBefore-amount, buffer = safetyBufferFor(w);
   const reminders=smartProjectReminder(projectId);
+  const ruleEval=evaluatePurchaseRules({amount,walletId,category,projectId,item});
+  const memories=relevantMemories({item,category,walletId,projectId});
   let status='approved', title='Fine. You may have it. 💋', message=`You can buy ${item || 'this'} and still leave ${money(Math.max(0,after))} free in ${w.name}. Don’t make this a habit.`;
   if(amount > Math.max(0,w.balance-w.reserved) || after < 0){ status='rejected'; title='Absolutely not, babe. 😒'; message=`This would use money already locked or needed for commitments in ${w.name}.`; }
   else if(budgetLeft !== null && amount > budgetLeft){ status='rejected'; title='Your budget already said no. 👀'; message=`You only have ${money(Math.max(0,budgetLeft))} left in the ${category} budget this month.`; }
-  else if(after < buffer){ status='caution'; title='Technically yes. Emotionally? No. 🥲'; message=`You would leave only ${money(Math.max(0,after))} free. Your ${['','chill','balanced','strict'][state.strictness]} setting wants a ${money(buffer)} personal buffer.`; }
+  else if(ruleEval.severity==='strict'){ status='rejected'; title='You literally taught me to say no. 😒'; message=ruleEval.findings.find(f=>f.severity==='strict')?.message || 'One of your strict rules blocks this.'; }
+  else if(after < buffer || ['warn','ask'].includes(ruleEval.severity)){ status='caution'; title=ruleEval.severity==='ask'?'You told me to ask twice. 👀':'Technically yes. Emotionally? No. 🥲'; message=ruleEval.findings.find(f=>['warn','ask'].includes(f.severity))?.message || `You would leave only ${money(Math.max(0,after))} free. Your ${['','chill','balanced','strict'][state.strictness]} setting wants a ${money(buffer)} personal buffer.`; }
   if(matchingCommitment && status!=='rejected') message += ` This matches a known ${category.toLowerCase()} obligation for the project.`;
-  return {status,title,message,freeBefore,after,budgetLeft,committed,buffer,reminders,matchingCommitmentId:matchingCommitment?.id||null};
+  return {status,title,message,freeBefore,after,budgetLeft,committed,buffer,reminders,matchingCommitmentId:matchingCommitment?.id||null,ruleFindings:ruleEval.findings,memories};
 }
 
 document.getElementById('askForm').addEventListener('submit', e => {
@@ -357,6 +498,8 @@ document.getElementById('askForm').addEventListener('submit', e => {
   card.className = `verdict-card ${r.status}`; const icon = r.status === 'approved' ? '💋' : r.status === 'rejected' ? '😒' : '👀';
   card.innerHTML = `<span class="eyebrow">Wifey has spoken</span><div class="verdict-icon">${icon}</div><h2>${r.title}</h2><p>${r.message}</p>
     <div class="verdict-breakdown"><div class="mini-row"><span>Free before</span><strong>${money(r.freeBefore||0)}</strong></div><div class="mini-row"><span>Purchase</span><strong>− ${money(amount)}</strong></div><div class="mini-row"><span>Free after</span><strong>${money(Math.max(0,r.after||0))}</strong></div></div>
+    ${r.ruleFindings?.length?`<div class="wifey-reminders rules-hit"><strong>Rules you taught me 🧠</strong>${r.ruleFindings.map(x=>`<span>• ${escapeHtml(x.message)}</span>`).join('')}</div>`:''}
+    ${r.memories?.length?`<div class="wifey-reminders memory-hit"><strong>Wifey remembers 💌</strong>${r.memories.map(x=>`<span>• ${escapeHtml(memoryText(x))}</span>`).join('')}</div>`:''}
     ${r.reminders?.length?`<div class="wifey-reminders"><strong>Before you forget</strong>${r.reminders.map(x=>`<span>• ${escapeHtml(x)}</span>`).join('')}</div>`:''}
     ${r.status !== 'rejected' ? `<button class="primary-btn" id="logPurchaseBtn">${r.status==='approved'?'Okay Wifey, log it 💸':'I know… log it anyway 🥲'}</button>` : ''}`;
   document.getElementById('logPurchaseBtn')?.addEventListener('click', () => {
@@ -468,29 +611,41 @@ function incomeAllocationForm(){
   const inputs=[...document.querySelectorAll('.allocation-input')], saveBtn=document.getElementById('saveIncomeBtn'), summary=document.getElementById('allocationSummary'), remainingEl=document.getElementById('allocationRemaining');
   const inputFor=id=>inputs.find(i=>i.dataset.wallet===id);
   const setAllocation=(id,value)=>{const i=inputFor(id);if(i)i.value=Math.max(0,Math.round(Number(value||0)));};
+  const addAllocation=(id,value)=>{const i=inputFor(id);if(i)i.value=Math.max(0,Math.round(Number(i.value||0)+Number(value||0)));};
   const recalc=()=>{ const total=Number(totalInput.value||0), allocated=inputs.reduce((sum,i)=>sum+Number(i.value||0),0), remaining=total-allocated, valid=total>0&&Math.abs(remaining)<.001; remainingEl.textContent=valid?'Fully allocated ✓':remaining<0?`${money(Math.abs(remaining))} over`:money(remaining); summary.classList.toggle('valid',valid); summary.classList.toggle('invalid',!valid); saveBtn.disabled=!valid; };
   const knownCosts=()=> Number((domainStatus.value==='unpaid'?document.getElementById('domainCost').value:0)||0)+Number((hostingStatus.value==='unpaid'?document.getElementById('hostingCost').value:0)||0)+Number(document.getElementById('otherProjectCost').value||0);
   const suggest=()=>{
     const total=Number(totalInput.value||0); inputs.forEach(i=>i.value=0); if(!total){recalc();return;}
     const emergency=Math.round(total*Number(state.brain.emergencyPercent||0)/100);
     const personal=Math.round(total*Number(state.brain.ownerPayPercent||0)/100);
+    const customSplits=source.value==='loan'?[]:incomeSplitRules(source.value,total);
+    const customTargets=new Set(customSplits.map(x=>x.walletId));
+    const customNotes=[];
+    const applyCustom=(remaining)=>{
+      customSplits.forEach(x=>{const take=Math.min(remaining,x.amount);if(take>0){addAllocation(x.walletId,take);remaining-=take;customNotes.push(`${x.percent}% → ${wallet(x.walletId)?.name||'wallet'} (${money(take)})`);}});
+      return remaining;
+    };
     if(source.value==='client'){
       const protectedCost=Math.min(total,knownCosts());
       if(projectReserve) setAllocation(projectReserve.id,protectedCost);
       let remaining=total-protectedCost;
-      const e=Math.min(remaining,emergency); setAllocation('reserve',e); remaining-=e;
-      const p=Math.min(remaining,personal); setAllocation('personal',p); remaining-=p;
-      setAllocation('lomos',remaining);
+      remaining=applyCustom(remaining);
+      if(!customTargets.has('reserve')){const e=Math.min(remaining,emergency);addAllocation('reserve',e);remaining-=e;}
+      if(!customTargets.has('personal')){const p=Math.min(remaining,personal);addAllocation('personal',p);remaining-=p;}
+      addAllocation('lomos',remaining);
       const selectedProject=projectSelect.value==='__new__'?null:project(projectSelect.value); const stage=document.getElementById('incomeStage').value; const pct=Number(state.brain.paymentPlan?.[stage]||0); const contract=selectedProject?.contractValue||Number(document.getElementById('newProjectContract')?.value||0); const expected=contract&&pct?Math.round(contract*pct/100):0;
-      advice.innerHTML=`<span class="eyebrow">Wifey’s read</span><p>${protectedCost?`${money(protectedCost)} is being protected for known project costs. `:''}${expected?`Your LOMOS ${stage} stage is ${pct}% (${money(expected)}). You received ${money(total)}. `:''}Client money is not profit until the job is delivered.</p>`;
+      advice.innerHTML=`<span class="eyebrow">Wifey’s read</span><p>${protectedCost?`${money(protectedCost)} is being protected for known project costs. `:''}${customNotes.length?`Rules applied: ${escapeHtml(customNotes.join(' · '))}. `:''}${expected?`Your LOMOS ${stage} stage is ${pct}% (${money(expected)}). You received ${money(total)}. `:''}Client money is not profit until the job is delivered.</p>`;
     } else if(source.value==='tappy'){
-      const e=Math.min(total,emergency); setAllocation('reserve',e); setAllocation('tappy',total-e); advice.innerHTML=`<span class="eyebrow">Wifey’s read</span><p>I’m keeping a ${state.brain.emergencyPercent}% safety slice and leaving the rest inside Tappy.</p>`;
+      let remaining=applyCustom(total); if(!customTargets.has('reserve')){const e=Math.min(remaining,emergency);addAllocation('reserve',e);remaining-=e;} addAllocation('tappy',remaining);
+      advice.innerHTML=`<span class="eyebrow">Wifey’s read</span><p>${customNotes.length?`Your rules applied: ${escapeHtml(customNotes.join(' · '))}. `:''}${!customTargets.has('reserve')?`I also kept the default ${state.brain.emergencyPercent}% safety slice. `:''}The rest stays inside Tappy.</p>`;
     } else if(source.value==='personal'){
-      const e=Math.min(total,emergency); setAllocation('reserve',e); setAllocation('personal',total-e); advice.innerHTML=`<span class="eyebrow">Wifey’s read</span><p>This is personal income, but I’m still protecting ${money(e)} as reserve.</p>`;
+      let remaining=applyCustom(total); if(!customTargets.has('reserve')){const e=Math.min(remaining,emergency);addAllocation('reserve',e);remaining-=e;} addAllocation('personal',remaining);
+      advice.innerHTML=`<span class="eyebrow">Wifey’s read</span><p>${customNotes.length?`Rules applied: ${escapeHtml(customNotes.join(' · '))}. `:''}The rest is personal money after the protected slices.</p>`;
     } else if(source.value==='loan'){
       setAllocation('personal',total); advice.innerHTML=`<span class="eyebrow">Wifey says</span><p>I can hold this money, but I will also create a ${money(total)} repayment obligation. Your balance can go up without your net position improving.</p>`;
     } else {
-      const e=Math.min(total,emergency); setAllocation('reserve',e); setAllocation(source.value==='lomos'?'lomos':'personal',total-e); advice.innerHTML=`<span class="eyebrow">Wifey’s read</span><p>${money(e)} protected. The rest goes to the most likely wallet. Change it if that is not the real purpose.</p>`;
+      let remaining=applyCustom(total); if(!customTargets.has('reserve')){const e=Math.min(remaining,emergency);addAllocation('reserve',e);remaining-=e;} addAllocation(source.value==='lomos'?'lomos':'personal',remaining);
+      advice.innerHTML=`<span class="eyebrow">Wifey’s read</span><p>${customNotes.length?`Rules applied: ${escapeHtml(customNotes.join(' · '))}. `:''}Everything else goes to the most likely wallet. Change it if that is not the real purpose.</p>`;
     }
     recalc();
   };
@@ -536,7 +691,7 @@ function transferForm(){
     <label>Date<input id="transferDate" type="date" value="${today}" /></label>
     <label class="full">Note<input id="transferDesc" placeholder="e.g. Owner draw" /></label>
     <button class="primary-btn full">Transfer</button></form>`);
-  document.getElementById('transferForm').onsubmit=e=>{e.preventDefault(); const from=wallet(transferFrom.value), amount=Number(transferAmount.value); if(transferFrom.value===transferTo.value){toast('Choose two different wallets.');return;} if(amount>Math.max(0,from.balance-from.reserved)){toast('That would use locked money.');return;} if(amount>walletSpendable(from)&&!confirm('This transfer uses money Wifey considers committed. Continue anyway?'))return; addTransfer({amount,fromWalletId:transferFrom.value,toWalletId:transferTo.value,description:transferDesc.value.trim()||'Wallet transfer',date:transferDate.value});closeModal();toast('Moved. And yes, I’m still watching. 👀');};
+  document.getElementById('transferForm').onsubmit=e=>{e.preventDefault(); const from=wallet(transferFrom.value), amount=Number(transferAmount.value); if(transferFrom.value===transferTo.value){toast('Choose two different wallets.');return;} if(amount>Math.max(0,from.balance-from.reserved)){toast('That would use locked money.');return;} const ruleEval=evaluateTransferRules({amount,fromWalletId:transferFrom.value,toWalletId:transferTo.value}); if(ruleEval.severity==='strict'){toast(ruleEval.findings[0]?.message||'A strict Wifey rule blocks this transfer.');return;} if(['warn','ask'].includes(ruleEval.severity)&&!confirm(`${ruleEval.findings.map(x=>x.message).join('\n')}\n\nWifey says think twice. Continue anyway?`))return; if(amount>walletSpendable(from)&&!confirm('This transfer uses money Wifey considers committed. Continue anyway?'))return; addTransfer({amount,fromWalletId:transferFrom.value,toWalletId:transferTo.value,description:transferDesc.value.trim()||'Wallet transfer',date:transferDate.value});closeModal();toast(ruleEval.findings.length?'Moved. You overruled me. I remember. 😒':'Moved. And yes, I’m still watching. 👀');};
 }
 function walletForm(id=null){
   const current=id?wallet(id):null;
@@ -584,6 +739,9 @@ document.getElementById('addWalletBtn').onclick = () => walletForm();
 document.getElementById('addBudgetBtn').onclick = budgetForm;
 document.getElementById('addProjectBtn').onclick = projectForm;
 document.getElementById('addCommitmentBtn').onclick = commitmentForm;
+['addRuleBtn','addRuleInlineBtn'].forEach(id=>{const el=document.getElementById(id);if(el)el.onclick=()=>ruleForm();});
+['addMemoryBtn','addMemoryInlineBtn'].forEach(id=>{const el=document.getElementById(id);if(el)el.onclick=()=>memoryForm();});
+document.querySelectorAll('[data-rule-preset]').forEach(btn=>btn.onclick=()=>openRulePreset(btn.dataset.rulePreset));
 
 document.querySelectorAll('.filter').forEach(b => b.onclick = () => { document.querySelectorAll('.filter').forEach(x => x.classList.remove('active')); b.classList.add('active'); currentFilter=b.dataset.filter; renderTransactions(); });
 document.getElementById('strictness').addEventListener('input', e => { state.strictness=Number(e.target.value); save(); });

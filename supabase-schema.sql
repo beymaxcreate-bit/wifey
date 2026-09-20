@@ -1,5 +1,5 @@
 -- Ask Wifey / PAW production-oriented Supabase schema draft
--- Run only when moving V1.2 from LocalStorage to Supabase.
+-- Run only when moving V1.4 from LocalStorage to Supabase.
 
 create extension if not exists pgcrypto;
 
@@ -119,3 +119,42 @@ begin
     execute format('create policy "Users manage own %s" on %I for all using (auth.uid() = user_id) with check (auth.uid() = user_id)', t, t);
   end loop;
 end $$;
+
+-- V1.4 teachable Wifey brain
+create table if not exists wifey_rules (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  name text not null,
+  type text not null check (type in ('min_balance','purchase_limit','monthly_category_cap','require_project','debt_first','income_split','transfer_limit','custom_reminder')),
+  severity text not null default 'warn' check (severity in ('warn','ask','strict')),
+  active boolean not null default true,
+  wallet_scope text not null default 'any',
+  category text not null default 'any',
+  amount numeric(14,2) not null default 0,
+  source_type text not null default 'any',
+  target_wallet_id uuid references wallets(id) on delete set null,
+  note text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists wifey_memories (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  area text not null default 'general' check (area in ('general','lomos','tappy','personal','projects')),
+  label text not null,
+  value text,
+  note text,
+  keywords text,
+  active boolean not null default true,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table wifey_rules enable row level security;
+alter table wifey_memories enable row level security;
+
+drop policy if exists "Users manage own wifey_rules" on wifey_rules;
+create policy "Users manage own wifey_rules" on wifey_rules for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+drop policy if exists "Users manage own wifey_memories" on wifey_memories;
+create policy "Users manage own wifey_memories" on wifey_memories for all using (auth.uid() = user_id) with check (auth.uid() = user_id);

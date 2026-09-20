@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-title" content="Ask Wifey" />
   <title>Ask Wifey — PAW</title>
   <link rel="manifest" href="manifest.webmanifest" />
-  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png" />
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
@@ -28,6 +28,7 @@
         <button class="nav-item" data-view-link="projects"><span>Projects</span></button>
         <button class="nav-item" data-view-link="budgets"><span>Budgets</span></button>
         <button class="nav-item" data-view-link="commitments"><span>Commitments</span></button>
+        <button class="nav-item" data-view-link="teach"><span>Teach Wifey</span></button>
         <button class="nav-item" data-view-link="settings"><span>Settings</span></button>
       </nav>
 
@@ -84,6 +85,11 @@
             <div class="mini-row"><span>Due in 30 days</span><strong id="upcomingCash">Rs. 0</strong></div>
           </article>
         </div>
+
+        <article class="teach-nudge">
+          <div><span class="eyebrow">Wifey can learn more 🧠</span><strong>Don’t just tell me domain prices. Teach me your actual rules.</strong><p>Minimum balances, Tappy splits, purchase limits, debt rules, project protection — make Wifey behave like your money manager.</p></div>
+          <button class="primary-btn" data-view-link="teach">Teach Wifey</button>
+        </article>
 
         <div class="section-head">
           <div><span class="eyebrow">Our money map</span><h2>Who owns what, babe?</h2></div>
@@ -163,6 +169,50 @@
         <article class="panel"><div id="commitmentList" class="list"></div></article>
       </section>
 
+      <section class="view" data-view="teach">
+        <div class="section-head teach-head">
+          <div><span class="eyebrow">Wifey brain 🧠💋</span><h2>Tell me how our money works.</h2><p class="subcopy">Rules tell Wifey what to do. Memory tells her what to remember. Both are used when she checks purchases and income.</p></div>
+          <div class="row-actions"><button class="ghost-btn" id="addMemoryBtn">+ Memory</button><button class="primary-btn" id="addRuleBtn">+ Teach a rule</button></div>
+        </div>
+
+        <div class="teach-stats">
+          <article class="mini-stat"><span class="eyebrow">Active rules</span><strong id="ruleCount">0</strong><small>Boundaries Wifey can enforce</small></article>
+          <article class="mini-stat"><span class="eyebrow">Memories</span><strong id="memoryCount">0</strong><small>Facts she can bring back at the right time</small></article>
+          <article class="mini-stat"><span class="eyebrow">Strict rules</span><strong id="strictRuleCount">0</strong><small>These can actually say “no”</small></article>
+        </div>
+
+        <article class="panel preset-panel">
+          <div class="panel-head"><div><span class="eyebrow">Fast lessons</span><h3>Teach the common stuff in one tap.</h3></div></div>
+          <div class="preset-grid" id="rulePresets">
+            <button class="preset-card" data-rule-preset="personal-floor"><span>🛟</span><strong>Keep a personal floor</strong><small>Never let spending take personal money below a number.</small></button>
+            <button class="preset-card" data-rule-preset="big-purchase"><span>👀</span><strong>Side-eye big purchases</strong><small>Make Wifey question purchases above your limit.</small></button>
+            <button class="preset-card" data-rule-preset="project-protection"><span>💼</span><strong>Protect project money</strong><small>No project-wallet spending without choosing the project.</small></button>
+            <button class="preset-card" data-rule-preset="debt-first"><span>🧾</span><strong>Debt before fun</strong><small>Warn or block optional spending while debt is open.</small></button>
+            <button class="preset-card" data-rule-preset="income-split"><span>💸</span><strong>Auto-split income</strong><small>Send a percentage of a money source to a chosen wallet.</small></button>
+            <button class="preset-card" data-rule-preset="owner-draw"><span>💅</span><strong>Cap owner draws</strong><small>Limit business-to-personal transfers.</small></button>
+          </div>
+        </article>
+
+        <div class="teach-grid">
+          <article class="panel">
+            <div class="panel-head"><div><span class="eyebrow">House rules</span><h3>What Wifey is allowed to enforce.</h3></div><button class="text-btn" id="addRuleInlineBtn">Teach another →</button></div>
+            <div id="ruleList" class="rule-list"></div>
+          </article>
+          <article class="panel">
+            <div class="panel-head"><div><span class="eyebrow">Wifey memory</span><h3>Facts worth remembering.</h3></div><button class="text-btn" id="addMemoryInlineBtn">Add memory →</button></div>
+            <div id="memoryList" class="memory-list"></div>
+          </article>
+        </div>
+
+        <article class="panel teach-help">
+          <span class="eyebrow">How it works</span><h3>Rules ≠ memory.</h3>
+          <div class="explain-grid">
+            <div><strong>Rule</strong><p>“If I try to spend from Project Reserve without choosing a project, block it.” Wifey can act on this.</p></div>
+            <div><strong>Memory</strong><p>“Tappy card printing usually costs Rs. 650 each.” Wifey can remind you when the purchase looks related.</p></div>
+          </div>
+        </article>
+      </section>
+
       <section class="view" data-view="settings">
         <div class="settings-grid">
           <article class="panel">
@@ -209,7 +259,7 @@
     <button class="mobile-nav-item" data-view-link="ask"><span class="nav-glyph">W</span><span>Ask</span></button>
     <button class="mobile-add" id="mobileAddBtn" aria-label="Add expense">♥</button>
     <button class="mobile-nav-item" data-view-link="transactions"><span class="nav-glyph">↕</span><span>Activity</span></button>
-    <button class="mobile-nav-item" data-view-link="wallets"><span class="nav-glyph">◫</span><span>Wallets</span></button>
+    <button class="mobile-nav-item" data-view-link="teach"><span class="nav-glyph">🧠</span><span>Teach</span></button>
   </nav>
 
   <div class="modal-backdrop" id="modalBackdrop" aria-hidden="true">

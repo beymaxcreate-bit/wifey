@@ -1,24 +1,30 @@
-# Ask Wifey — PAW V1.3
+# Ask Wifey — PAW V1.4
 
-V1.3 keeps the V1.2 money logic and gives the app a more playful, character-led **Wifey** experience.
+V1.4 turns Ask Wifey from a fixed finance tracker into a teachable rule-based money manager.
 
-## New in V1.3
-- Warm premium Wifey visual system: rose, butter, mint and dark cocoa tones.
-- Dynamic **Wifey mood** based on safe-to-spend money, overdue commitments, budgets and open business tasks.
-- Wifey avatar and speech-bubble briefing on the home screen.
-- More playful mobile navigation and stronger phone-first styling.
-- New Wifey microcopy across spending verdicts, income, transfers, budgets and backups.
-- Approved / caution / rejected verdict reactions with subtle motion.
-- Existing V1.2 local data remains compatible because the same local storage key is used.
+## New in V1.4
+
+- Cute strict Wifey PWA icon for iPhone / Android
+- Teach Wifey page
+- Custom enforceable money rules
+- Wifey Memory with keyword triggers
+- Rule presets for minimum personal balance, large purchases, project money, debt-first spending, income splits, and owner draws
+- Strict / Ask me first / Warn me rule modes
+- Purchase checks now evaluate your rules
+- Relevant memories appear in purchase verdicts
+- Income auto-split rules change Wifey's allocation suggestion
+- Business-to-personal transfer rules are enforced
+- Custom reminders can appear in the Wifey Briefing
+- Existing V1.3 local data is migrated automatically
 
 ## Run locally
-From this folder:
 
 ```bash
 python -m http.server 8080 --bind 0.0.0.0
 ```
 
-Then open `http://localhost:8080` on the computer. On a phone connected to the same Wi-Fi, open `http://YOUR-PC-IP:8080`.
+Then open http://localhost:8080.
 
 ## Important
-This is still a local-first prototype. Before real deployment, the next major technical step should be Supabase authentication + cloud sync so phone and laptop share the same data.
+
+V1.4 still stores data in browser localStorage. Export backups before clearing browser data. Cloud sync / login should be the next major infrastructure upgrade.
