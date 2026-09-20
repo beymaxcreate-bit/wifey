@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#17110f" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Ask Wifey" />
+  <title>Ask Wifey — PAW</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <a class="brand" href="#" data-view-link="dashboard" aria-label="Ask Wifey home">
+        <div class="brand-mark"><span>W</span><b>♥</b></div>
+        <div><strong>Ask Wifey</strong><span>PAW · she knows where it went</span></div>
+      </a>
+
+      <nav class="desktop-nav" aria-label="Main navigation">
+        <button class="nav-item active" data-view-link="dashboard"><span>Overview</span></button>
+        <button class="nav-item" data-view-link="ask"><span>Ask Wifey</span></button>
+        <button class="nav-item" data-view-link="transactions"><span>Transactions</span></button>
+        <button class="nav-item" data-view-link="wallets"><span>Wallets</span></button>
+        <button class="nav-item" data-view-link="projects"><span>Projects</span></button>
+        <button class="nav-item" data-view-link="budgets"><span>Budgets</span></button>
+        <button class="nav-item" data-view-link="commitments"><span>Commitments</span></button>
+        <button class="nav-item" data-view-link="settings"><span>Settings</span></button>
+      </nav>
+
+      <div class="sidebar-note">
+        <span class="eyebrow">House rule 💋</span>
+        <p>Just because money came in doesn’t mean you’re rich. Give every rupee a job first.</p>
+      </div>
+    </aside>
+
+    <main>
+      <header class="topbar">
+        <div>
+          <div class="eyebrow" id="todayLabel"></div>
+          <h1 id="pageTitle">Here’s what you actually have.</h1>
+        </div>
+        <div class="top-actions">
+          <div class="wifey-mood-chip" id="wifeyMoodChip"><span id="wifeyMoodEmoji">👀</span><div><small>Wifey mood</small><strong id="wifeyMoodText">Watching you</strong></div></div>
+          <button class="ghost-btn" id="quickExpenseBtn">I spent money 🥲</button>
+          <button class="primary-btn" id="quickIncomeBtn">I got paid 💸</button>
+        </div>
+      </header>
+
+      <section class="view active" data-view="dashboard">
+        <div id="dataNotice" class="notice hidden"></div>
+
+        <div class="hero-grid">
+          <article class="safe-card" id="safeCard">
+            <div class="wifey-intro">
+              <div class="wifey-avatar" id="wifeyAvatar" aria-hidden="true"><span class="wifey-face" id="wifeyFace">😌</span><i class="wifey-heart">♥</i></div>
+              <div class="speech-bubble">
+                <span class="eyebrow">Wifey says</span>
+                <strong id="wifeyGreeting">Okay babe, money check.</strong>
+                <p id="wifeyOneLiner">I’ll tell you what’s yours and what already has a job.</p>
+              </div>
+            </div>
+            <div class="safe-head">
+              <div><span class="eyebrow">Your “yes babe” money</span><div class="status-copy" id="safeStatus">Protected</div></div>
+              <span class="status-dot"></span>
+            </div>
+            <div class="money" id="safeToSpend">Rs. 0</div>
+            <p id="safeMessage">Wifey is checking the numbers.</p>
+            <div class="hero-actions">
+              <button class="ask-btn" data-view-link="ask">Babe, can I buy this? →</button>
+              <button class="text-btn" id="dashboardTransferBtn">Move money quietly 👀</button>
+            </div>
+          </article>
+
+          <article class="balance-card">
+            <span class="eyebrow">The receipts 🧾</span>
+            <div class="money small" id="totalCash">Rs. 0</div>
+            <div class="mini-row"><span>Total cash</span><strong id="totalCashMini">Rs. 0</strong></div>
+            <div class="mini-row"><span>Business available</span><strong id="businessAvailable">Rs. 0</strong></div>
+            <div class="mini-row"><span>Locked / reserve</span><strong id="lockedCash">Rs. 0</strong></div>
+            <div class="mini-row"><span>Due in 30 days</span><strong id="upcomingCash">Rs. 0</strong></div>
+          </article>
+        </div>
+
+        <div class="section-head">
+          <div><span class="eyebrow">Our money map</span><h2>Who owns what, babe?</h2></div>
+          <button class="text-btn" data-view-link="wallets">Manage wallets →</button>
+        </div>
+        <div class="wallet-grid" id="walletGrid"></div>
+
+        <div class="two-col">
+          <article class="panel">
+            <div class="panel-head"><div><span class="eyebrow">Recent</span><h3>Latest movement</h3></div><button class="text-btn" data-view-link="transactions">View all</button></div>
+            <div id="recentTransactions" class="list"></div>
+          </article>
+          <article class="panel">
+            <div class="panel-head"><div><span class="eyebrow">Wifey radar</span><h3>I saw that spending. 👀</h3></div></div>
+            <div id="budgetPulse" class="list"></div>
+          </article>
+        </div>
+
+        <article class="panel wifey-brief-panel">
+          <div class="panel-head"><div><span class="eyebrow">Wifey briefing 💌</span><h3>Things I need you to remember.</h3></div></div>
+          <div id="wifeyBriefing" class="brief-list"></div>
+        </article>
+
+        <article class="panel commitments-preview">
+          <div class="panel-head"><div><span class="eyebrow">Coming up</span><h3>Don’t touch this money, okay? 😌</h3></div><button class="text-btn" data-view-link="commitments">Manage →</button></div>
+          <div id="commitmentPreview" class="list"></div>
+        </article>
+      </section>
+
+      <section class="view" data-view="ask">
+        <div class="ask-layout">
+          <article class="ask-panel">
+            <span class="eyebrow">Permission desk 💅</span>
+            <h2>Babe… what are we buying? 👀</h2>
+            <p class="subcopy">Tell me first. I’ll check the wallet, locked money, your budget, upcoming bills and the stuff you conveniently forgot.</p>
+            <form id="askForm" class="form-grid">
+              <label>What is it?<input id="askItem" required placeholder="e.g. .lk domain" autocomplete="off" /></label>
+              <label>How much?<input id="askAmount" required type="number" min="1" step="1" inputmode="numeric" placeholder="6500" /></label>
+              <label>Pay from<select id="askWallet"></select></label>
+              <label>Category<select id="askCategory"></select></label>
+              <label>Project (optional)<select id="askProject"></select></label>
+              <button class="primary-btn full" type="submit">Wifey, can I? 🥺</button>
+            </form>
+          </article>
+          <article class="verdict-card" id="verdictCard">
+            <span class="eyebrow">The verdict 💋</span>
+            <div class="verdict-icon">👀</div>
+            <h2>I’m listening, babe.</h2>
+            <p>Tell me what you want to buy. I promise to be reasonable-ish.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="view" data-view="transactions">
+        <div class="section-head"><div><span class="eyebrow">Ledger</span><h2>Where the money went.</h2></div><div class="row-actions"><button class="ghost-btn" id="transferBtn">↔ Transfer</button><button class="primary-btn" id="addTransactionBtn">+ Expense</button></div></div>
+        <div class="filters"><button class="filter active" data-filter="all">All</button><button class="filter" data-filter="income">Income</button><button class="filter" data-filter="expense">Expenses</button><button class="filter" data-filter="transfer">Transfers</button></div>
+        <article class="panel"><div id="transactionList" class="list"></div></article>
+      </section>
+
+      <section class="view" data-view="wallets">
+        <div class="section-head"><div><span class="eyebrow">Wallets</span><h2>Separate the money in your head.</h2></div><div class="row-actions"><button class="ghost-btn" id="walletTransferBtn">↔ Transfer</button><button class="primary-btn" id="addWalletBtn">+ Wallet</button></div></div>
+        <div class="wallet-grid large" id="walletManageGrid"></div>
+      </section>
+
+      <section class="view" data-view="projects">
+        <div class="section-head"><div><span class="eyebrow">Client money</span><h2>Revenue ≠ profit.</h2></div><button class="primary-btn" id="addProjectBtn">+ Project</button></div>
+        <div id="projectGrid" class="project-grid"></div>
+      </section>
+
+      <section class="view" data-view="budgets">
+        <div class="section-head"><div><span class="eyebrow">Limits</span><h2>Give spending a ceiling.</h2></div><button class="primary-btn" id="addBudgetBtn">+ Budget</button></div>
+        <div id="budgetGrid" class="budget-grid"></div>
+      </section>
+
+      <section class="view" data-view="commitments">
+        <div class="section-head"><div><span class="eyebrow">Bills & subscriptions</span><h2>Money already promised.</h2></div><button class="primary-btn" id="addCommitmentBtn">+ Commitment</button></div>
+        <article class="panel"><div id="commitmentList" class="list"></div></article>
+      </section>
+
+      <section class="view" data-view="settings">
+        <div class="settings-grid">
+          <article class="panel">
+            <span class="eyebrow">Wifey personality</span><h2>Strict, not annoying.</h2>
+            <p class="subcopy">Strictness changes how large a personal safety buffer Wifey expects you to leave untouched.</p>
+            <label class="range-label">Strictness <input id="strictness" type="range" min="1" max="3" step="1" /><span id="strictnessLabel"></span></label>
+          </article>
+          <article class="panel">
+            <span class="eyebrow">Wifey brain · LOMOS</span><h2>Teach her your normal rules.</h2>
+            <p class="subcopy">These are planning defaults, not market prices. Update them whenever your real costs change.</p>
+            <form id="brainForm" class="form-grid compact">
+              <label>Usual domain cost<input id="brainDomainCost" type="number" min="0" inputmode="numeric" /></label>
+              <label>Usual hosting cost<input id="brainHostingCost" type="number" min="0" inputmode="numeric" /></label>
+              <label>Owner pay %<input id="brainOwnerPay" type="number" min="0" max="100" /></label>
+              <label>Emergency reserve %<input id="brainEmergency" type="number" min="0" max="100" /></label>
+              <label>Advance %<input id="brainAdvance" type="number" min="0" max="100" /></label>
+              <label>Approval %<input id="brainApproval" type="number" min="0" max="100" /></label>
+              <label>Deployment %<input id="brainDeployment" type="number" min="0" max="100" /></label>
+              <button class="primary-btn full" type="submit">Save Wifey brain</button>
+            </form>
+          </article>
+          <article class="panel">
+            <span class="eyebrow">Data safety</span><h2>Your records live on this device.</h2>
+            <p class="subcopy">Until Supabase sync is connected, export backups. You can now restore them too.</p>
+            <div class="row-actions"><button class="ghost-btn" id="exportBtn">Export backup</button><button class="ghost-btn" id="importBtn">Restore backup</button><input id="importFile" type="file" accept="application/json" hidden /></div>
+          </article>
+          <article class="panel">
+            <span class="eyebrow">Install</span><h2>Put Wifey on your home screen.</h2>
+            <p class="subcopy" id="installCopy">Once served over HTTPS, Ask Wifey can install as a PWA.</p>
+            <button class="primary-btn" id="installBtn" hidden>Install Ask Wifey</button>
+          </article>
+          <article class="panel danger-panel">
+            <span class="eyebrow">Danger zone</span><h2>Start over.</h2>
+            <p class="subcopy">This removes all local transactions, wallets, projects, budgets and commitments.</p>
+            <button class="danger-btn" id="resetBtn">Reset local data</button>
+          </article>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <nav class="mobile-nav" aria-label="Mobile navigation">
+    <button class="mobile-nav-item active" data-view-link="dashboard"><span class="nav-glyph">⌂</span><span>Home</span></button>
+    <button class="mobile-nav-item" data-view-link="ask"><span class="nav-glyph">W</span><span>Ask</span></button>
+    <button class="mobile-add" id="mobileAddBtn" aria-label="Add expense">♥</button>
+    <button class="mobile-nav-item" data-view-link="transactions"><span class="nav-glyph">↕</span><span>Activity</span></button>
+    <button class="mobile-nav-item" data-view-link="wallets"><span class="nav-glyph">◫</span><span>Wallets</span></button>
+  </nav>
+
+  <div class="modal-backdrop" id="modalBackdrop" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <button class="close-btn" id="closeModal" aria-label="Close">×</button>
+      <div id="modalContent"></div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script src="app.js"></script>
+</body>
+</html>
