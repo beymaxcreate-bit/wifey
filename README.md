@@ -1,4 +1,4 @@
-# Ask Wifey — PAW V1.4.3.1
+# Ask Wifey — PAW V1.4.4
 
 V1.4.3 turns Ask Wifey from a fixed finance tracker into a teachable rule-based money manager.
 
@@ -59,3 +59,14 @@ After deploying this version, remove the old Ask Wifey Home Screen icon from iPh
 - Overriding a caution triggers an “I warned you” reaction.
 - Direct expense entry is also classified after saving, so Wifey reacts even when you skip Ask Wifey.
 - Emoji particles, mobile vibration where supported, and reduced-motion accessibility support.
+
+
+## V1.4.4 — iPhone keyboard + reaction fixes
+
+- Mobile form controls are forced to 16px+ so iOS Safari no longer auto-zooms the whole PWA when typing.
+- Modal forms no longer auto-focus and summon the iPhone keyboard as soon as they open.
+- Uses the Visual Viewport API to track the actual visible height while the keyboard opens/closes.
+- Modal sheets resize to the visible viewport and focused fields scroll into view.
+- Wifey reactions now dismiss the keyboard and wait briefly for the viewport to recover before celebrating / yelling.
+- Reaction layouts scale down gracefully on very short visible screens.
+- PWA/cache version bumped to `14401`.

@@ -328,6 +328,38 @@ function openRulePreset(name){
   }; ruleForm(null,presets[name]||null);
 }
 
+
+function isMobileViewport(){ return window.matchMedia('(max-width: 980px)').matches; }
+function syncVisualViewport(){
+  const vv=window.visualViewport;
+  const h=Math.max(1,Math.round(vv?.height||window.innerHeight));
+  const top=Math.max(0,Math.round(vv?.offsetTop||0));
+  document.documentElement.style.setProperty('--visual-vh',`${h}px`);
+  document.documentElement.style.setProperty('--visual-top',`${top}px`);
+  const layoutH=document.documentElement.clientHeight||window.innerHeight;
+  document.body.classList.toggle('keyboard-open',isMobileViewport() && (layoutH-h)>120);
+}
+function keyboardIsLikelyOpen(){
+  if(!isMobileViewport()) return false;
+  const active=document.activeElement;
+  const editing=active && /^(INPUT|TEXTAREA|SELECT)$/.test(active.tagName);
+  const vv=window.visualViewport;
+  const shrunken=vv ? ((document.documentElement.clientHeight||window.innerHeight)-vv.height)>120 : false;
+  return Boolean(editing||shrunken);
+}
+function dismissPhoneKeyboard(){
+  const active=document.activeElement;
+  if(active && /^(INPUT|TEXTAREA|SELECT)$/.test(active.tagName)) active.blur();
+  syncVisualViewport();
+}
+if(window.visualViewport){
+  window.visualViewport.addEventListener('resize',syncVisualViewport,{passive:true});
+  window.visualViewport.addEventListener('scroll',syncVisualViewport,{passive:true});
+}
+window.addEventListener('resize',syncVisualViewport,{passive:true});
+window.addEventListener('orientationchange',()=>setTimeout(syncVisualViewport,120),{passive:true});
+syncVisualViewport();
+
 const titles = {
   dashboard:'Okay babe, here’s the situation. 💋', ask:'Permission before purchase. 👀', transactions:'Show me the receipts. 🧾',
   wallets:'Our money, properly separated.', projects:'Client money is not shopping money.', budgets:'Boundaries are attractive. 😌',
@@ -501,6 +533,7 @@ function safetyBufferFor(w){
 }
 const OPTIONAL_SPEND_CATEGORIES = ['Going out','Shopping','Other'];
 let wifeyReactionTimer = null;
+let pendingWifeyReactionTimer = null;
 
 function reactionParticles(symbols, count=16){
   const holder=document.getElementById('wifeyReactionParticles');
@@ -520,6 +553,18 @@ function reactionParticles(symbols, count=16){
 }
 
 function showWifeyReaction(kind, detail={}){
+  // On iPhone the keyboard can still own most of the visual viewport after a form
+  // submits. Dismiss it first and let the viewport recover before Wifey appears.
+  if(!detail.__viewportReady && keyboardIsLikelyOpen()){
+    dismissPhoneKeyboard();
+    clearTimeout(pendingWifeyReactionTimer);
+    pendingWifeyReactionTimer=setTimeout(()=>{
+      syncVisualViewport();
+      showWifeyReaction(kind,{...detail,__viewportReady:true});
+    },360);
+    return;
+  }
+  syncVisualViewport();
   const root=document.getElementById('wifeyReaction');
   if(!root) return;
   const profiles={
@@ -558,6 +603,7 @@ function showWifeyReaction(kind, detail={}){
 
 document.getElementById('wifeyReaction')?.addEventListener('click',()=>{
   clearTimeout(wifeyReactionTimer);
+  clearTimeout(pendingWifeyReactionTimer);
   document.getElementById('wifeyReaction')?.classList.remove('show');
   document.getElementById('wifeyReaction')?.setAttribute('aria-hidden','true');
   document.body.classList.remove('wifey-screen-shake');
@@ -653,11 +699,19 @@ function modal(html){
   document.getElementById('modalBackdrop').classList.add('open');
   document.getElementById('modalBackdrop').setAttribute('aria-hidden','false');
   syncBodySheetLock();
-  setTimeout(() => document.querySelector('#modalContent input, #modalContent select, #modalContent textarea')?.focus({preventScroll:true}), 80);
+  // Desktop can autofocus. On iPhone/mobile, autofocus immediately opens the
+  // keyboard and shrinks/zooms the app before the user has even chosen a field.
+  if(!isMobileViewport()) setTimeout(() => document.querySelector('#modalContent input, #modalContent select, #modalContent textarea')?.focus({preventScroll:true}), 80);
+  else setTimeout(syncVisualViewport,40);
 }
 function closeModal(){ document.getElementById('modalBackdrop').classList.remove('open'); document.getElementById('modalBackdrop').setAttribute('aria-hidden','true'); syncBodySheetLock(); }
 document.getElementById('closeModal').onclick = closeModal;
 document.getElementById('modalBackdrop').addEventListener('click', e => { if(e.target.id === 'modalBackdrop') closeModal(); });
+document.getElementById('modalBackdrop').addEventListener('focusin',e=>{
+  if(!isMobileViewport() || !/^(INPUT|TEXTAREA|SELECT)$/.test(e.target?.tagName||'')) return;
+  setTimeout(()=>{ syncVisualViewport(); e.target.scrollIntoView({block:'center',behavior:'smooth'}); },260);
+});
+
 document.addEventListener('keydown', e => { if(e.key === 'Escape'){ if(document.getElementById('modalBackdrop')?.classList.contains('open'))closeModal(); else closeMobileMore(); } });
 
 function expenseForm(){

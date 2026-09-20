@@ -1,13 +1,13 @@
-const CACHE='ask-wifey-v1.4.3-1-cache';
+const CACHE='ask-wifey-v1.4.4-1-cache';
 const ASSETS=[
   './',
   './index.html',
-  './styles.css?v=14301',
-  './app.js?v=14301',
-  './manifest.webmanifest?v=14301',
-  './icons/icon-192.png?v=14301',
-  './icons/icon-512.png?v=14301',
-  './icons/apple-touch-icon-180.png?v=14301'
+  './styles.css?v=14401',
+  './app.js?v=14401',
+  './manifest.webmanifest?v=14401',
+  './icons/icon-192.png?v=14401',
+  './icons/icon-512.png?v=14401',
+  './icons/apple-touch-icon-180.png?v=14401'
 ];
 
 self.addEventListener('install',event=>{
