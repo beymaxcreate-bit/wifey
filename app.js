@@ -1,5 +1,5 @@
 const STORAGE_KEY = 'ask-wifey-v1';
-const APP_VERSION = '1.4';
+const APP_VERSION = '1.4.3';
 const money = n => `Rs. ${Math.round(Number(n || 0)).toLocaleString('en-LK')}`;
 const uid = () => (crypto.randomUUID ? crypto.randomUUID().slice(0, 12) : Math.random().toString(36).slice(2, 12));
 const localDate = d => {
@@ -499,6 +499,83 @@ function safetyBufferFor(w){
   if(w?.type !== 'personal') return 0;
   return state.strictness === 3 ? 5000 : state.strictness === 2 ? 2500 : 0;
 }
+const OPTIONAL_SPEND_CATEGORIES = ['Going out','Shopping','Other'];
+let wifeyReactionTimer = null;
+
+function reactionParticles(symbols, count=16){
+  const holder=document.getElementById('wifeyReactionParticles');
+  if(!holder) return;
+  holder.innerHTML='';
+  for(let i=0;i<count;i++){
+    const el=document.createElement('span');
+    el.className='wifey-particle';
+    el.textContent=symbols[i%symbols.length];
+    el.style.setProperty('--x',`${Math.round((Math.random()-.5)*88)}vw`);
+    el.style.setProperty('--y',`${Math.round(-18-Math.random()*50)}vh`);
+    el.style.setProperty('--r',`${Math.round((Math.random()-.5)*90)}deg`);
+    el.style.setProperty('--delay',`${(Math.random()*.18).toFixed(2)}s`);
+    el.style.setProperty('--size',`${18+Math.round(Math.random()*16)}px`);
+    holder.appendChild(el);
+  }
+}
+
+function showWifeyReaction(kind, detail={}){
+  const root=document.getElementById('wifeyReaction');
+  if(!root) return;
+  const profiles={
+    income:{tone:'happy',emoji:'😍',kicker:'Wifey is VERY happy',title:'THAT’S MY BABE! 💸',message:`${detail.amount?money(detail.amount)+' came in. ':''}I’m proud of you. Now let’s make every rupee behave.`,symbols:['💸','✨','💋','💰','♥'],duration:1850},
+    clientIncome:{tone:'happy',emoji:'🥰',kicker:'Client paid!',title:'YESSSS, BABE! 💼💸',message:`${detail.amount?money(detail.amount)+' received. ':''}Good work. I protected the project money before you got any ideas.`,symbols:['💸','✨','💼','💋','♥'],duration:2000},
+    loan:{tone:'watch',emoji:'👀',kicker:'Money arrived… but',title:'DON’T GET EXCITED YET.',message:`${detail.amount?money(detail.amount)+' came in, but ':''}this is borrowed money. I’m remembering the repayment too.`,symbols:['👀','🧾','💸'],duration:1900},
+    approved:{tone:'proud',emoji:'😌',kicker:'Wifey approves',title:'FINE. YOU EARNED A YES. 💋',message:detail.message||'This one fits the plan. Enjoy it without wrecking the rest.',symbols:['💋','✨','♥'],duration:1250},
+    responsible:{tone:'proud',emoji:'🥹',kicker:'Look at you adulting',title:'PROUD OF YOU. 🫶',message:detail.message||'Necessary money, handled properly. This is the kind of spending I like.',symbols:['✨','🫶','✅'],duration:1400},
+    caution:{tone:'sad',emoji:'🥲',kicker:'Wifey is worried',title:'BABE… DO WE REALLY NEED THIS?',message:detail.message||'You can technically do it, but future-you is going to feel this one.',symbols:['🥲','💔','👀'],duration:1700},
+    badSpend:{tone:'angry',emoji:'😤',kicker:'Wifey saw that',title:'EXCUSE ME?! 😤',message:detail.message||'That was fun money while our numbers are already tight. You are on thin ice, mister.',symbols:['😤','💢','👀','💸'],duration:1950},
+    rejected:{tone:'angry',emoji:'😡',kicker:'Wifey said NO',title:'PUT. IT. BACK. 😤',message:detail.message||'That money already has a job. We are not stealing from future-us.',symbols:['😡','💢','🚫','👀'],duration:2050},
+    override:{tone:'angry',emoji:'😭',kicker:'You overruled Wifey',title:'I LITERALLY WARNED YOU 😭',message:detail.message||'Fine. I logged it. But I am absolutely bringing this up later.',symbols:['😭','💔','😤','👀'],duration:2050}
+  };
+  const p=profiles[kind]||profiles.caution;
+  clearTimeout(wifeyReactionTimer);
+  root.className=`wifey-reaction tone-${p.tone}`;
+  document.getElementById('wifeyReactionEmoji').textContent=p.emoji;
+  document.getElementById('wifeyReactionKicker').textContent=p.kicker;
+  document.getElementById('wifeyReactionTitle').textContent=p.title;
+  document.getElementById('wifeyReactionMessage').textContent=p.message;
+  reactionParticles(p.symbols,p.tone==='happy'?22:14);
+  root.setAttribute('aria-hidden','false');
+  requestAnimationFrame(()=>root.classList.add('show'));
+  if(p.tone==='angry'){
+    document.body.classList.remove('wifey-screen-shake');
+    void document.body.offsetWidth;
+    document.body.classList.add('wifey-screen-shake');
+    if(navigator.vibrate) navigator.vibrate([55,35,70]);
+  }
+  wifeyReactionTimer=setTimeout(()=>{
+    root.classList.remove('show');
+    root.setAttribute('aria-hidden','true');
+    document.body.classList.remove('wifey-screen-shake');
+  },p.duration);
+}
+
+document.getElementById('wifeyReaction')?.addEventListener('click',()=>{
+  clearTimeout(wifeyReactionTimer);
+  document.getElementById('wifeyReaction')?.classList.remove('show');
+  document.getElementById('wifeyReaction')?.setAttribute('aria-hidden','true');
+  document.body.classList.remove('wifey-screen-shake');
+});
+
+function expenseReaction({amount,walletId,category,projectId=null,forced=false}){
+  const w=wallet(walletId), optional=OPTIONAL_SPEND_CATEGORIES.includes(category);
+  const budget=budgetFor(category), spent=monthSpent(category), ratio=budget?.limit?spent/budget.limit:0;
+  const safe=personalSafeToSpend();
+  if(forced) return 'override';
+  if((w?.balance||0)<0) return 'badSpend';
+  if(optional && (ratio>1 || (w?.type==='personal' && safe<=0))) return 'badSpend';
+  if(optional && (amount>=5000 || ratio>=.8 || (w?.type==='personal' && safe<5000))) return 'caution';
+  if(projectId && ['Domains','Hosting','Project costs','Software'].includes(category)) return 'responsible';
+  if(['Bills','Subscriptions','Domains','Hosting'].includes(category)) return 'responsible';
+  return 'approved';
+}
+
 function askWifey(amount,walletId,category,item,projectId=null){
   const w = wallet(walletId); if(!w) return {status:'rejected',title:'Pick a real wallet.',message:'Wifey cannot check money that has nowhere to live.',ruleFindings:[],memories:[]};
   const budget = budgetFor(category), spent = monthSpent(category), budgetLeft = budget ? budget.limit-spent : null;
@@ -529,8 +606,10 @@ document.getElementById('askForm').addEventListener('submit', e => {
     ${r.memories?.length?`<div class="wifey-reminders memory-hit"><strong>Wifey remembers 💌</strong>${r.memories.map(x=>`<span>• ${escapeHtml(memoryText(x))}</span>`).join('')}</div>`:''}
     ${r.reminders?.length?`<div class="wifey-reminders"><strong>Before you forget</strong>${r.reminders.map(x=>`<span>• ${escapeHtml(x)}</span>`).join('')}</div>`:''}
     ${r.status !== 'rejected' ? `<button class="primary-btn" id="logPurchaseBtn">${r.status==='approved'?'Okay Wifey, log it 💸':'I know… log it anyway 🥲'}</button>` : ''}`;
+  if(r.status==='rejected') showWifeyReaction('rejected',{message:r.message});
+  else if(r.status==='caution') showWifeyReaction('caution',{message:r.message});
   document.getElementById('logPurchaseBtn')?.addEventListener('click', () => {
-    addExpense({amount,walletId,category,description:item,projectId}); if(r.matchingCommitmentId){const c=state.commitments.find(x=>x.id===r.matchingCommitmentId);if(c){if(c.frequency==='annual'){const d=parseDateLocal(c.dueDate);d.setFullYear(d.getFullYear()+1);c.dueDate=localDate(d);}else c.active=false;save();}} toast('Noted. I saw that. 👀'); showView('dashboard');
+    addExpense({amount,walletId,category,description:item,projectId}); if(r.matchingCommitmentId){const c=state.commitments.find(x=>x.id===r.matchingCommitmentId);if(c){if(c.frequency==='annual'){const d=parseDateLocal(c.dueDate);d.setFullYear(d.getFullYear()+1);c.dueDate=localDate(d);}else c.active=false;save();}} const reaction=r.status==='caution'?'override':expenseReaction({amount,walletId,category,projectId}); showWifeyReaction(reaction,{message:r.status==='caution'?`You spent ${money(amount)} even after my warning. I logged it, but I am judging you. 👀`:`${money(amount)} logged for ${item||category}.`}); toast('Noted. I saw that. 👀'); showView('dashboard');
   });
 });
 
@@ -593,8 +672,10 @@ function expenseForm(){
   document.getElementById('txForm').onsubmit = e => {
     e.preventDefault(); const amount=Number(txAmount.value), w=wallet(txWallet.value);
     if(amount > w.balance && !confirm(`${w.name} will go negative. Log it anyway?`)) return;
-    addExpense({amount,walletId:txWallet.value,category:txCategory.value,description:txDesc.value.trim(),date:txDate.value,projectId:txProject.value||null});
-    closeModal(); toast('Okay. It’s in the books. 👀');
+    const expenseData={amount,walletId:txWallet.value,category:txCategory.value,description:txDesc.value.trim(),date:txDate.value,projectId:txProject.value||null};
+    addExpense(expenseData);
+    const reaction=expenseReaction(expenseData);
+    closeModal(); showWifeyReaction(reaction,{message:reaction==='badSpend'?`${money(amount)} on ${txCategory.value} while the numbers are tight? Babe. We need to talk.`:reaction==='caution'?`${money(amount)} on ${txCategory.value}. I logged it, but I’m watching the rest of this month very closely.`:`${money(amount)} logged for ${txDesc.value.trim()}.`}); toast('Okay. It’s in the books. 👀');
   };
 }
 function incomeAllocationForm(){
@@ -708,7 +789,10 @@ function incomeAllocationForm(){
         const other=Number(document.getElementById('otherProjectCost').value||0); if(other>0){const nm=document.getElementById('otherProjectCostName').value.trim()||'Known project cost';state.commitments.push({id:uid(),name:nm,amount:other,walletId:reserveWallet,category:'Project costs',dueDate:today,frequency:'one-off',active:true,projectId,kind:'project-cost'});}
       }
       if(source.value==='loan') state.commitments.push({id:uid(),name:`Repay ${document.getElementById('incomeDesc').value.trim()||'borrowed money'}`,amount,walletId:document.getElementById('loanRepayWallet').value,category:'Bills',dueDate:document.getElementById('loanDueDate').value,frequency:'one-off',active:true,projectId:null,kind:'debt'});
-      save();closeModal();toast('Money received. I already gave it jobs. 💅');
+      save();closeModal();
+      const reactionKind=source.value==='loan'?'loan':source.value==='client'?'clientIncome':'income';
+      showWifeyReaction(reactionKind,{amount,source:source.value,description:document.getElementById('incomeDesc')?.value?.trim()||''});
+      toast(source.value==='loan'?'Money received. Repayment remembered. 👀':'Money received. I already gave it jobs. 💅');
     }catch(err){toast(err.message);}
   };
 }
@@ -755,7 +839,7 @@ function payCommitment(id){
   const c=state.commitments.find(x=>x.id===id); if(!c)return; const w=wallet(c.walletId); if(c.amount>w.balance&&!confirm(`${w?.name||'Wallet'} will go negative. Record payment anyway?`))return;
   addExpense({amount:c.amount,walletId:c.walletId,category:c.category,description:c.name,date:today,projectId:c.projectId||null});
   if(c.frequency==='monthly'){const d=parseDateLocal(c.dueDate);d.setMonth(d.getMonth()+1);c.dueDate=localDate(d);c.active=true;}else if(c.frequency==='annual'){const d=parseDateLocal(c.dueDate);d.setFullYear(d.getFullYear()+1);c.dueDate=localDate(d);c.active=true;}else c.active=false;
-  save();toast(c.frequency==='monthly'?'Paid. Next month is scheduled.':'Paid and cleared.');
+  save();showWifeyReaction('responsible',{message:`${money(c.amount)} paid for ${c.name}. Bills handled before they became drama. Proud of you. 🫶`});toast(c.frequency==='monthly'?'Paid. Next month is scheduled.':'Paid and cleared.');
 }
 
 // Primary actions
@@ -816,5 +900,13 @@ function toast(msg){ const el=document.getElementById('toast'); el.textContent=m
 function escapeHtml(s=''){ return String(s).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c])); }
 function escapeAttr(s=''){ return escapeHtml(s).replace(/`/g,'&#96;'); }
 
-if('serviceWorker' in navigator){ navigator.serviceWorker.register('./sw.js?v=14101').catch(()=>{}); }
+const launchSplash=document.getElementById('launchSplash');
+if(launchSplash){
+  window.setTimeout(()=>{
+    launchSplash.classList.add('is-hiding');
+    window.setTimeout(()=>launchSplash.remove(),380);
+  },900);
+}
+
+if('serviceWorker' in navigator){ navigator.serviceWorker.register('./sw.js?v=14301').catch(()=>{}); }
 renderAll();

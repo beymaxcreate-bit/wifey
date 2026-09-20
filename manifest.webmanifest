@@ -2,7 +2,7 @@
   "name": "Ask Wifey — PAW",
   "short_name": "Ask Wifey",
   "id": "/",
-  "start_url": "./?pwa=14101",
+  "start_url": "./?pwa=14301",
   "scope": "./",
   "display": "standalone",
   "background_color": "#17110f",
@@ -10,13 +10,13 @@
   "description": "Your slightly strict money wifey — separate personal and business money, protect commitments, and ask before you spend.",
   "icons": [
     {
-      "src": "icons/icon-192.png?v=14101",
+      "src": "icons/icon-192.png?v=14301",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "icons/icon-512.png?v=14101",
+      "src": "icons/icon-512.png?v=14301",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"

@@ -1,8 +1,8 @@
-# Ask Wifey — PAW V1.4.1.1
+# Ask Wifey — PAW V1.4.3.1
 
-V1.4.1 turns Ask Wifey from a fixed finance tracker into a teachable rule-based money manager.
+V1.4.3 turns Ask Wifey from a fixed finance tracker into a teachable rule-based money manager.
 
-## New in V1.4.1
+## New in V1.4.3
 
 - Cute strict Wifey PWA icon for iPhone / Android
 - Teach Wifey page
@@ -27,9 +27,9 @@ Then open http://localhost:8080.
 
 ## Important
 
-V1.4.1 still stores data in browser localStorage. Export backups before clearing browser data. Cloud sync / login should be the next major infrastructure upgrade.
+V1.4.3 still stores data in browser localStorage. Export backups before clearing browser data. Cloud sync / login should be the next major infrastructure upgrade.
 
-## V1.4.1 mobile / iPhone fixes
+## V1.4.3 mobile / iPhone fixes
 
 - ships the complete `icons/` directory with 180px, 192px and 512px Wifey icons
 - adds cache-busted Apple touch icons and PWA assets
@@ -40,3 +40,22 @@ V1.4.1 still stores data in browser localStorage. Export backups before clearing
 - uses a network-first navigation strategy so new Vercel deploys are less likely to stay stuck behind an old service-worker cache
 
 After deploying this version, remove the old Ask Wifey Home Screen icon from iPhone once, reopen the live site in Safari, and use **Share → Add to Home Screen** so iOS fetches the new icon.
+
+
+## V1.4.3 creator signature
+
+- Added a subtle footer: `Made with 💋 by Buddhima Jaya Sri`.
+- Added a short branded launch screen using the Wifey icon with `A personal money manager by Buddhima Jaya Sri`.
+- Bumped PWA/cache asset version to `14201`.
+
+
+## V1.4.3 — Wifey reactions
+- Happy celebration overlay when real income arrives.
+- Special client-payment celebration with project-money reminder.
+- Borrowed money gets a watchful, non-celebratory reaction.
+- Approved purchases get a proud Wifey reaction.
+- Tight / optional spending triggers worried or sad Wifey.
+- Rejected purchases trigger an angry animated reaction and subtle screen shake.
+- Overriding a caution triggers an “I warned you” reaction.
+- Direct expense entry is also classified after saving, so Wifey reacts even when you skip Ask Wifey.
+- Emoji particles, mobile vibration where supported, and reduced-motion accessibility support.
